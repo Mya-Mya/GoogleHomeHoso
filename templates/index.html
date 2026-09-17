@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Home TTS</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+    <style>
+        html,
+        body {
+            height: 100dvh;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        main {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #chat-history {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        #composer {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            padding-block: 0.5rem;
+            background: var(--pico-background-color);
+        }
+
+        #composer input {
+            flex: 1;
+            margin: 0;
+        }
+
+        #composer button {
+            width: auto;
+            white-space: nowrap;
+            margin: 0;
+        }
+
+        .chat-entry {
+            margin: 0;
+        }
+
+        .chat-entry .chat-status {
+            display: block;
+            margin-top: 0.5rem;
+        }
+
+    </style>
+</head>
+
+<body>
+    <main>
+        <h2 onclick="showSettings();" style="cursor: pointer;">Google Home Hoso</h2>
+        <div id="chat-history"></div>
+        <div id="composer">
+            <input id="text-input" type="text" placeholder="喋るテキスト">
+            <button type="button" id="text-send-button">送信</button>
+        </div>
+    </main>
+
+    <script defer>
+        /** @returns {HTMLElement} */
+        const $ = (selector) => document.querySelector(selector)
+
+        const $ChatHistory = $("#chat-history")
+        const $TextInput = $("#text-input")
+        const $TextSendButton = $("#text-send-button")
+
+
+        function showSettings() {
+            alert(
+                "Hoso Server → Google Home:\n {{googlehome_address}}:{{googlehome_port}}\n\n" +
+                "Google Home → Hoso Server:\n {{server_address}}:{{server_port}}"
+            )
+        }
+
+        class EntryPresenter {
+            /**
+             * @param {string} label view上部に表示する本文テキスト
+             * @param {HTMLElement | null} extraContent 本文の下に追加で表示する要素
+             */
+            constructor(label, extraContent = null) {
+                this.$view = document.createElement("article")
+                this.$view.className = "chat-entry"
+
+                const $label = document.createElement("p")
+                $label.textContent = label
+                this.$view.append($label)
+
+                if (extraContent) {
+                    this.$view.append(extraContent)
+                }
+
+                this.$status = document.createElement("small")
+                this.$status.className = "chat-status"
+                this.$view.append(this.$status)
+
+                this.$resendButton = document.createElement("button")
+                this.$resendButton.type = "button"
+                this.$resendButton.textContent = "再送信"
+                this.$view.append(this.$resendButton)
+
+                this.$resendButton.addEventListener("click", async () => {
+                    this.$resendButton.disabled = true
+                    await this.send()
+                    this.$resendButton.disabled = false
+                })
+            }
+
+            /** @returns {HTMLElement} この履歴エントリのview */
+            getView() {
+                return this.$view
+            }
+
+            /**
+             * APIを呼び出し、結果を$statusに反映する。サブクラスで実装する。
+             * @returns {Promise<void>}
+             */
+            async send() {
+                throw new Error("send() must be implemented by subclass")
+            }
+
+            /**
+             * fetchでAPIを呼び出し、成功/失敗を$statusに反映する共通処理。
+             * @param {string} url
+             * @param {object} body
+             */
+            async _postJson(url, body) {
+                this.$status.textContent = "送信中..."
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(body)
+                    })
+                    const data = await response.json()
+
+                    if (response.ok) {
+                        this.$status.textContent = `✓ ${data.status}`
+                    } else {
+                        this.$status.textContent = `✗ ${data.error}`
+                    }
+                } catch (error) {
+                    this.$status.textContent = `✗ エラー: ${String(error)}`
+                }
+            }
+        }
+
+        class TextEntryPresenter extends EntryPresenter {
+            /** @param {string} text */
+            constructor(text) {
+                super(text)
+                this.text = text
+            }
+
+            async send() {
+                await this._postJson("./api/speak", { text: this.text })
+            }
+        }
+
+        /**
+         * Presenterを生成し、viewをチャット履歴に追加した上で最初の送信を行う。
+         * @param {EntryPresenter} presenter
+         */
+        async function addEntryAndSend(presenter) {
+            $ChatHistory.append(presenter.getView())
+            await presenter.send()
+        }
+
+        $TextSendButton.addEventListener("click", async (e) => {
+            e.preventDefault()
+            const text = String($TextInput.value).trim()
+            if (!text) {
+                return
+            }
+
+            $TextSendButton.disabled = true
+
+            await addEntryAndSend(new TextEntryPresenter(text))
+
+            $TextInput.value = ""
+            $TextSendButton.disabled = false
+        })
+
+    </script>
+
+</body>
+
+</html>
