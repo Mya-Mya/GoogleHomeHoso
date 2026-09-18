@@ -63,6 +63,7 @@ def let_googlehome_play_audio(
     base64_data: str | None = None,
     audio_bytes: bytes | None = None,
     content_type: str = "audio/mpeg",
+    volume: float | None = None,
 ) -> tuple[bool, str]:
     assert googlehome_player, "Google Home player is not initiated."
     assert server_address and server_port, "Server address/port not set."
@@ -84,7 +85,9 @@ def let_googlehome_play_audio(
 
     # Play media if URL is available
     if url:
-        return googlehome_player.play_media(url, content_type=content_type)
+        return googlehome_player.play_media(
+            url, content_type=content_type, volume=volume
+        )
 
     return False, "Either url, base64_data, or audio_bytes is required."
 
@@ -110,9 +113,19 @@ def api_speak():
     if not text:
         return jsonify({"error": "The text is empty."}), 400
 
+    volume = data.get("volume")
+    if volume is not None:
+        try:
+            volume = float(volume)
+            volume = max(0, min(0.5, volume))
+        except ValueError, TypeError:
+            volume = None
+
     try:
         audio_bytes = text_to_speech_bytes(text)
-        success, message = let_googlehome_play_audio(audio_bytes=audio_bytes)
+        success, message = let_googlehome_play_audio(
+            audio_bytes=audio_bytes, volume=volume
+        )
         if not success:
             return jsonify({"error": message}), 400
 
@@ -128,12 +141,20 @@ def api_play():
     base64_data = data.get("base64")
     content_type = data.get("content_type", "audio/mpeg")
 
+    volume = data.get("volume")
+    if volume is not None:
+        try:
+            volume = float(volume)
+            volume = max(0, min(0.5, volume))
+        except ValueError, TypeError:
+            volume = None
+
     if not url and not base64_data:
         return jsonify({"error": "Either url or base64 is required."}), 400
 
     try:
         success, message = let_googlehome_play_audio(
-            url=url, base64_data=base64_data, content_type=content_type
+            url=url, base64_data=base64_data, content_type=content_type, volume=volume
         )
         if not success:
             return jsonify({"error": message}), 400

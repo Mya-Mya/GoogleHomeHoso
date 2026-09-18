@@ -59,7 +59,6 @@
             display: block;
             margin-top: 0.5rem;
         }
-
     </style>
 </head>
 
@@ -171,7 +170,7 @@
             }
 
             async send() {
-                await this._postJson("./api/speak", { text: this.text })
+                await this._postJson("./api/speak", { text: this.text, volume: 0.45 })
             }
         }
 
