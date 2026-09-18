@@ -85,7 +85,7 @@ class GoogleHomePlayer:
             self.device = None
             return False, str(e)
 
-    def play_media(self, audio_url: str, volume: float | None = None) -> tuple[bool, str]:
+    def play_media(self, audio_url: str, content_type:str= "audio/mpeg", volume: float | None = None) -> tuple[bool, str]:
         if not self.device:
             connected, msg = self.connect()
             if not connected:
@@ -100,7 +100,7 @@ class GoogleHomePlayer:
                 self.set_volume_level(volume)
 
             mc = self.device.media_controller
-            mc.play_media(audio_url, "audio/mpeg")
+            mc.play_media(audio_url, content_type)
 
             if volume is not None:
                 threading.Thread(

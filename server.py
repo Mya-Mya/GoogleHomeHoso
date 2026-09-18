@@ -62,6 +62,7 @@ def let_googlehome_play_audio(
     url: str | None = None,
     base64_data: str | None = None,
     audio_bytes: bytes | None = None,
+    content_type: str = "audio/mpeg",
 ) -> tuple[bool, str]:
     assert googlehome_player, "Google Home player is not initiated."
     assert server_address and server_port, "Server address/port not set."
@@ -83,7 +84,7 @@ def let_googlehome_play_audio(
 
     # Play media if URL is available
     if url:
-        return googlehome_player.play_media(url)
+        return googlehome_player.play_media(url, content_type=content_type)
 
     return False, "Either url, base64_data, or audio_bytes is required."
 
@@ -125,12 +126,15 @@ def api_play():
     data = request.get_json()
     url = data.get("url")
     base64_data = data.get("base64")
+    content_type = data.get("content_type", "audio/mpeg")
 
     if not url and not base64_data:
         return jsonify({"error": "Either url or base64 is required."}), 400
 
     try:
-        success, message = let_googlehome_play_audio(url=url, base64_data=base64_data)
+        success, message = let_googlehome_play_audio(
+            url=url, base64_data=base64_data, content_type=content_type
+        )
         if not success:
             return jsonify({"error": message}), 400
         return jsonify({"status": "Success"}), 200
